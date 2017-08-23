@@ -1,0 +1,681 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7873393..5d20eb4 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -15,18 +15,22 @@ endif()
+ # global configuration
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/)
+ 
+-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs")
++if (NOT WIN32)
++    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs")
++endif()
+ 
+-# check for C++ 11 support:
+-include(CheckCXXCompilerFlag)
+-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+-if(COMPILER_SUPPORTS_CXX11)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+-elseif(COMPILER_SUPPORTS_CXX0X)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+-else()
+-        message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
++# check for C++ 11 support (skip on windows):
++if (NOT WIN32)
++    include(CheckCXXCompilerFlag)
++    CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
++    CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
++    if(COMPILER_SUPPORTS_CXX11)
++        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
++    elseif(COMPILER_SUPPORTS_CXX0X)
++        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
++    else()
++	    message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
++    endif()
+ endif()
+ 
+ # C++ STL debug symbols
+diff --git a/bin/CMakeLists.txt b/bin/CMakeLists.txt
+index f27b9e9..4ba7144 100644
+--- a/bin/CMakeLists.txt
++++ b/bin/CMakeLists.txt
+@@ -1,6 +1,7 @@
+-cmake_minimum_required(VERSION 2.8)
++cmake_minimum_required(VERSION 3.8)
+ message( "\nConfiguring bin:" )
+ 
++set(Boost_USE_STATIC_LIBS OFF)
+ find_package(Boost REQUIRED program_options)
+ 
+ include_directories(
+@@ -13,6 +14,7 @@ foreach(src ${BIN_SRCS})
+     get_filename_component(bin_name ${src} NAME_WE)
+     add_executable(${bin_name} ${src})
+     target_link_libraries(${bin_name} dpct ${Boost_LIBRARIES})
++    target_compile_definitions(${bin_name} PRIVATE -DBOOST_ALL_NO_LIB -DBOOST_ALL_DYN_LINK)
+     install(TARGETS ${bin_name} 
+         ARCHIVE DESTINATION lib
+         LIBRARY DESTINATION lib
+diff --git a/conda-recipe/bld.bat b/conda-recipe/bld.bat
+index e69de29..1a691f5 100755
+--- a/conda-recipe/bld.bat
++++ b/conda-recipe/bld.bat
+@@ -0,0 +1,32 @@
++mkdir build
++cd build
++
++set CONFIGURATION=Release
++
++REM set LINKER_FLAGS="-L${PREFIX}/lib"
++REM set DYLIB="dylib"
++REM if [ `uname` != "Darwin" ]; then
++    REM LINKER_FLAGS="-Wl,-rpath-link,${PREFIX}/lib ${LINKER_FLAGS}"
++    REM set DYLIB="so"
++REM fi
++
++cmake .. -G "%CMAKE_GENERATOR%" -DCMAKE_PREFIX_PATH="%LIBRARY_PREFIX%" -DCMAKE_INSTALL_PREFIX="%LIBRARY_PREFIX%"
++if errorlevel 1 exit 1
++
++REM cmake .. \
++    REM -DCMAKE_C_COMPILER=${PREFIX}/bin/gcc \
++    REM -DCMAKE_CXX_COMPILER=${PREFIX}/bin/g++ \
++    REM -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 \
++    REM -DCMAKE_INSTALL_PREFIX=${PREFIX} \
++    REM -DCMAKE_BUILD_TYPE=Release \
++    REM -DPYTHON_EXECUTABLE=${PYTHON} \
++    REM -DPYTHON_LIBRARY=${PREFIX}/lib/libpython2.7.${DYLIB} \
++    REM -DPYTHON_INCLUDE_DIR=${PREFIX}/include/python2.7 \
++    REM -DPYTHON_INCLUDE_DIR2=${PREFIX}/include/python2.7 \
++    REM -DWITH_LOG=OFF
++
++cmake --build . --target ALL_BUILD --config %CONFIGURATION%
++if errorlevel 1 exit 1
++
++cmake --build . --target INSTALL --config %CONFIGURATION%
++if errorlevel 1 exit 1
+diff --git a/conda-recipe/meta.yaml b/conda-recipe/meta.yaml
+index dad1902..ae9fb70 100644
+--- a/conda-recipe/meta.yaml
++++ b/conda-recipe/meta.yaml
+@@ -1,41 +1,49 @@
++{% set BOOST_VERSION = '1.60.0' %}
++
+ package:
+     name: dpct
+-  
+-    {% set tagged_version = GIT_DESCRIBE_TAG %}
+ 
++  {% if GIT_DESCRIBE_NUMBER|int == 0 %}
++    version: {{GIT_DESCRIBE_TAG}}
++  {% else %}
+     # If we're using a non-tagged revision, append '.postN' to the version
+-    {% if GIT_DESCRIBE_NUMBER|int != 0 %}
+-      {% set tagged_version = tagged_version + '.post' + GIT_DESCRIBE_NUMBER %}
+-    {% endif %}
+-
+-    version: {{tagged_version}}
++    version: {{GIT_DESCRIBE_TAG}}.post{{GIT_DESCRIBE_NUMBER}}
++  {% endif %}
+ 
+ source:
+-    path: ../
++    git_url: https://github.com/chaubold/dpct
++    git_tag: "1.2" # master 2017/02/27
++    # git_tag: 0b54eb97db6b6c5f1944b36b5d8e15ea260ae550 # master 2017/02/27
++    patches:
++      - windows_cmake_and_code.patch  # [win]
+ 
+ build:
+   number: 0
+-  string: py{{CONDA_PY}}_{{PKG_BUILDNUM}}_g{{GIT_FULL_HASH[:7]}}
++  string: py{{CONDA_PY}}_boost{{BOOST_VERSION}}_{{PKG_BUILDNUM}}_g{{GIT_FULL_HASH[:7]}}
++  detect_binary_files_with_prefix: true
++  msvc_compiler: 14.0  # [win]
+ 
+ requirements:
+   build:
++    - cmake
+     - gcc 4.8.5 # [linux]
+     - gcc 4.8.5 # [osx]
+     - patchelf # [linux]
+-    - boost 1.55.0
++    - boost {{BOOST_VERSION}}
+     - lemon
+     - python {{PY_VER}}*
+ 
+   run:
+-    - libgcc 4.8.5
++    - libgcc 4.8.5 # [linux]
++    - libgcc 4.8.5 # [osx]
+     - patchelf # [linux]
+-    - boost 1.55.0
++    - boost {{BOOST_VERSION}}
+     - lemon
+     - python {{PY_VER}}*
+ 
+-test:
+-  imports:
+-    - dpct
++# test:
++  # imports:
++    # - dpct
+ 
+ about:
+     home: https://github.com/chaubold/dpct
+diff --git a/conda-recipe/windows_cmake_and_code.patch b/conda-recipe/windows_cmake_and_code.patch
+index e69de29..3c33cad 100755
+--- a/conda-recipe/windows_cmake_and_code.patch
++++ b/conda-recipe/windows_cmake_and_code.patch
+@@ -0,0 +1,173 @@
++diff --git a/CMakeLists.txt b/CMakeLists.txt
++index 7873393..20841fd 100644
++--- a/CMakeLists.txt
+++++ b/CMakeLists.txt
++@@ -15,18 +15,22 @@ endif()
++ # global configuration
++ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/)
++ 
++-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs")
+++if (NOT WIN32)
+++    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-local-typedefs")
+++endif()
++ 
++-# check for C++ 11 support:
++-include(CheckCXXCompilerFlag)
++-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
++-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
++-if(COMPILER_SUPPORTS_CXX11)
++-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
++-elseif(COMPILER_SUPPORTS_CXX0X)
++-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
++-else()
++-        message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+++# check for C++ 11 support (skip on windows):
+++if (NOT WIN32)
+++    include(CheckCXXCompilerFlag)
+++    CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+++    CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+++    if(COMPILER_SUPPORTS_CXX11)
+++        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+++    elseif(COMPILER_SUPPORTS_CXX0X)
+++        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+++    else()
+++	    message(SEND_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+++    endif()
++ endif()
++ 
++ # C++ STL debug symbols
++@@ -47,7 +51,7 @@ include_directories(${LEMON_INCLUDE_DIR})
++ # build library
++ file(GLOB_RECURSE SOURCES src/*.cpp)
++ file(GLOB_RECURSE HEADERS include/*.h)
++-add_library(dpct SHARED ${SOURCES} ${HEADERS})
+++add_library(dpct STATIC ${SOURCES} ${HEADERS})
++ target_link_libraries(dpct ${LEMON_LIBRARIES})
++ 
++ # installation
++diff --git a/bin/CMakeLists.txt b/bin/CMakeLists.txt
++index f27b9e9..e395a55 100644
++--- a/bin/CMakeLists.txt
+++++ b/bin/CMakeLists.txt
++@@ -1,6 +1,7 @@
++ cmake_minimum_required(VERSION 2.8)
++ message( "\nConfiguring bin:" )
++ 
+++set(Boost_USE_STATIC_LIBS OFF)
++ find_package(Boost REQUIRED program_options)
++ 
++ include_directories(
++@@ -13,6 +14,7 @@ foreach(src ${BIN_SRCS})
++     get_filename_component(bin_name ${src} NAME_WE)
++     add_executable(${bin_name} ${src})
++     target_link_libraries(${bin_name} dpct ${Boost_LIBRARIES})
+++    target_compile_definitions(${bin_name} PRIVATE -DBOOST_ALL_NO_LIB -DBOOST_ALL_DYN_LINK)
++     install(TARGETS ${bin_name} 
++         ARCHIVE DESTINATION lib
++         LIBRARY DESTINATION lib
++diff --git a/conda-recipe/meta.yaml b/conda-recipe/meta.yaml
++index dad1902..e18a302 100644
++--- a/conda-recipe/meta.yaml
+++++ b/conda-recipe/meta.yaml
++@@ -1,35 +1,41 @@
++ package:
++     name: dpct
++-  
++-    {% set tagged_version = GIT_DESCRIBE_TAG %}
++ 
+++  {% if GIT_DESCRIBE_NUMBER|int == 0 %}
+++    version: {{GIT_DESCRIBE_TAG}}
+++  {% else %}
++     # If we're using a non-tagged revision, append '.postN' to the version
++-    {% if GIT_DESCRIBE_NUMBER|int != 0 %}
++-      {% set tagged_version = tagged_version + '.post' + GIT_DESCRIBE_NUMBER %}
++-    {% endif %}
++-
++-    version: {{tagged_version}}
+++    version: {{GIT_DESCRIBE_TAG}}.post{{GIT_DESCRIBE_NUMBER}}
+++  {% endif %}
++ 
++ source:
++-    path: ../
+++    git_url: https://github.com/chaubold/dpct
+++    git_tag: "1.2" # master 2017/02/27
+++    # git_tag: 0b54eb97db6b6c5f1944b36b5d8e15ea260ae550 # master 2017/02/27
+++    patches:
+++      - windows_cmake_and_code.patch  # [win]
++ 
++ build:
++   number: 0
++   string: py{{CONDA_PY}}_{{PKG_BUILDNUM}}_g{{GIT_FULL_HASH[:7]}}
+++  detect_binary_files_with_prefix: true
+++  msvc_compiler: 14.0  # [win]
++ 
++ requirements:
++   build:
+++    - cmake
++     - gcc 4.8.5 # [linux]
++     - gcc 4.8.5 # [osx]
++     - patchelf # [linux]
++-    - boost 1.55.0
+++    - boost >=1.55.0
++     - lemon
++     - python {{PY_VER}}*
++ 
++   run:
++-    - libgcc 4.8.5
+++    - libgcc 4.8.5 # [linux]
+++    - libgcc 4.8.5 # [osx]
++     - patchelf # [linux]
++-    - boost 1.55.0
+++    - boost >=1.55.0
++     - lemon
++     - python {{PY_VER}}*
++ 
++diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
++index fb7b61a..6c844c5 100644
++--- a/python/CMakeLists.txt
+++++ b/python/CMakeLists.txt
++@@ -43,7 +43,7 @@ endif()
++ # make use of ${PYTHON_EXECUTABLE} instead of /usr/bin/python
++ if(NOT DEFINED PYDPCT_INSTALL_DIR OR PYDPCT_INSTALL_DIR MATCHES "^$")
++     execute_process(COMMAND ${PYTHON_EXECUTABLE} -c 
++-                    "from distutils.sysconfig import *; print get_python_lib(1)"
+++                    "from distutils.sysconfig import *; print(get_python_lib(1))"
++                     OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
++     file(TO_CMAKE_PATH ${PYTHON_SITE_PACKAGES} PYDPCT_INSTALL_DIR)
++ endif()
++diff --git a/src/magnusson.cpp b/src/magnusson.cpp
++index c3b70f6..7ef5a32 100644
++--- a/src/magnusson.cpp
+++++ b/src/magnusson.cpp
++@@ -2,6 +2,7 @@
++ #include <algorithm>
++ #include <assert.h>
++ #include <sstream>
+++#include <random>
++ 
++ #include "magnusson.h"
++ #include "trackingalgorithm.h"
++diff --git a/src/residualgraph.cpp b/src/residualgraph.cpp
++index 478684b..ef326e2 100644
++--- a/src/residualgraph.cpp
+++++ b/src/residualgraph.cpp
++@@ -94,7 +94,7 @@ ResidualGraph::ShortestPathResult ResidualGraph::findShortestPath(
++ 
++     	// prepare for new iteration
++     	TimePoint iterationInitTime = std::chrono::high_resolution_clock::now();
++-		if(firstPath_ or !partialBFUpdates)
+++		if(firstPath_ || !partialBFUpdates)
++ 		{
++ 			firstPath_ = false;
++ 			bf.init();
++diff --git a/src/userdata.cpp b/src/userdata.cpp
++index abb3506..e215b6e 100644
++--- a/src/userdata.cpp
+++++ b/src/userdata.cpp
++@@ -1,5 +1,6 @@
++ #include "userdata.h"
++ #include <stdexcept>
+++#include <string>
++ 
++ namespace dpct
++ {
+diff --git a/include/config.hpp b/include/config.hpp
+index e69de29..fb3d68b 100755
+--- a/include/config.hpp
++++ b/include/config.hpp
+@@ -0,0 +1,10 @@
++#pragma once
++#ifdef _MSC_VER
++#  ifdef dpct_EXPORTS
++#    define DPCT_API  __declspec(dllexport)
++#  else
++#    define DPCT_API  __declspec(dllimport)
++#  endif
++#else
++#  define DPCT_API
++#endif
+diff --git a/include/flowgraph.h b/include/flowgraph.h
+index de8551e..5a78e04 100644
+--- a/include/flowgraph.h
++++ b/include/flowgraph.h
+@@ -1,6 +1,8 @@
+ #ifndef DPCT_FLOWGRAPH_H
+ #define DPCT_FLOWGRAPH_H
+ 
++#include "config.hpp"
++
+ #include <lemon/adaptors.h>
+ #include <lemon/bellman_ford.h>
+ #include <lemon/list_graph.h>
+@@ -21,7 +23,7 @@ namespace dpct
+  * It can run min cost max flow tracking based on the bellman ford shortest path algorithm,
+  * but alters the residual graph in each iteration such that it obeys all consistency constraints.
+  */
+-class FlowGraph {
++class DPCT_API FlowGraph {
+ public: // typedefs
+ 	typedef lemon::ListDigraph Graph;
+     typedef Graph::Node Node;
+diff --git a/include/graph.h b/include/graph.h
+index 8d076b2..d7f688c 100644
+--- a/include/graph.h
++++ b/include/graph.h
+@@ -1,6 +1,8 @@
+ #ifndef DPCT_GRAPH_H
+ #define DPCT_GRAPH_H
+ 
++#include "config.hpp"
++
+ #include <memory>
+ #include <functional>
+ #include <map>
+@@ -12,7 +14,7 @@
+ namespace dpct
+ {
+ 
+-class Graph
++class DPCT_API Graph
+ {
+ public:
+ 	typedef std::shared_ptr<Node> NodePtr;
+@@ -25,7 +27,7 @@ public:
+ 
+ 	typedef std::function<void(Node*)> VisitorFunction;
+ 
+-	class Configuration
++	class DPCT_API Configuration
+ 	{
+ 	public:
+ 		Configuration(bool enableAppearance, 
+diff --git a/include/graphreader.h b/include/graphreader.h
+index b290079..cb699b9 100644
+--- a/include/graphreader.h
++++ b/include/graphreader.h
+@@ -1,6 +1,8 @@
+ #ifndef GRAPH_READER
+ #define GRAPH_READER 
+ 
++#include "config.hpp"
++
+ #include "log.h"
+ #include <vector>
+ #include <map>
+@@ -15,7 +17,7 @@ class GraphBuilder;
+  * @brief Base class for all graph readers implementing common constants and functions
+  * 
+  */
+-class GraphReader
++class DPCT_API GraphReader
+ {
+ public:
+ 	typedef double ValueType;
+diff --git a/include/jsongraphreader.h b/include/jsongraphreader.h
+index 17ed7d1..b8d0d87 100644
+--- a/include/jsongraphreader.h
++++ b/include/jsongraphreader.h
+@@ -1,6 +1,8 @@
+ #ifndef JSON_GRAPH_READER
+ #define JSON_GRAPH_READER 
+ 
++#include "config.hpp"
++
+ #include <json/json.h>
+ 
+ #include "graphreader.h"
+@@ -17,7 +19,7 @@ namespace dpct
+  * and stores a mapping from JSON ids to graph nodes
+  * 
+  */
+-class JsonGraphReader : public GraphReader
++class DPCT_API JsonGraphReader : public GraphReader
+ {
+ public:
+ 	/**
+diff --git a/include/magnusson.h b/include/magnusson.h
+index cfb7cc5..dcd4f8d 100644
+--- a/include/magnusson.h
++++ b/include/magnusson.h
+@@ -1,6 +1,8 @@
+ #ifndef DPCT_MAGNUSSON_H
+ #define DPCT_MAGNUSSON_H
+ 
++#include "config.hpp"
++
+ #include <functional>
+ 
+ #include "trackingalgorithm.h"
+@@ -39,7 +41,7 @@ private:
+ //     @ ISBI 2012
+ // * Global linking of cell tracks using the Viterbi algorithm
+ //     @ IEEE Transactions on Medical Imaging 2014
+-class Magnusson : public TrackingAlgorithm
++class DPCT_API Magnusson : public TrackingAlgorithm
+ {
+ public:
+     //--------------------------------------
+diff --git a/include/node.h b/include/node.h
+index c9e555a..a6cdb78 100644
+--- a/include/node.h
++++ b/include/node.h
+@@ -1,6 +1,8 @@
+ #ifndef DPCT_NODE_H
+ #define DPCT_NODE_H
+ 
++#include "config.hpp"
++
+ #include <vector>
+ #include <cstddef>
+ #include <limits>
+@@ -27,59 +29,59 @@ public:
+     Node() = delete;
+     Node(const Node&) = delete;
+ 
+-    explicit Node(const std::vector<double>& cellCountScore = {},
++	explicit Node(const std::vector<double>& cellCountScore = {},
+          UserDataPtr data = UserDataPtr());
+     // this dedicated copy constructor does NOT copy connected arcs, but only node internals
+-    Node(const Node& n,
++	Node(const Node& n,
+          UserDataPtr data = UserDataPtr());
+ 
+-	void increaseCellCount();
+-    void addToCellCountScore(size_t state, double score);
+-
+-	void registerInArc(Arc* arc);
+-	void registerOutArc(Arc* arc);
+-    bool removeInArc(Arc* arc);
+-    bool removeOutArc(Arc* arc);
+-
+-	void reset();
+-	void updateBestInArcAndScore();
+-
+-	ArcIt getInArcsBegin()  { return inArcs_.begin(); }
+-	ArcIt getInArcsEnd()    { return inArcs_.end(); }
+-	ArcIt getOutArcsBegin() { return outArcs_.begin(); }
+-	ArcIt getOutArcsEnd()   { return outArcs_.end(); }
+-    ConstArcIt getInArcsBegin() const { return inArcs_.begin(); }
+-    ConstArcIt getInArcsEnd()   const { return inArcs_.end(); }
+-    ConstArcIt getOutArcsBegin()const { return outArcs_.begin(); }
+-    ConstArcIt getOutArcsEnd()  const { return outArcs_.end(); }
+-    void visitInArcs(const VisitorFunction& func);
+-    void visitInArcs (const ConstVisitorFunction& func) const;
+-    void visitOutArcs(const VisitorFunction& func);
+-    void visitOutArcs (const ConstVisitorFunction& func) const;
+-
+-    Arc* getAppearanceArc() const    { return appearanceArc_; }
+-    Arc* getDisappearanceArc() const { return disappearanceArc_; }
+-
+-    Arc*  getBestInArc() const     { return bestInArc_; }
+-    size_t getCellCount() const    { return cellCount_; }
+-    double getCurrentScore() const { return currentScore_; }
+-    size_t getNumStates() const {return cellCountScore_.size(); }
+-
+-    size_t getNumInArcs() const  { return inArcs_.size(); }
+-    size_t getNumOutArcs() const { return outArcs_.size(); }
+-
+-    size_t getNumActiveDivisions() const { return numActiveDivisions_; }
+-    void increaseNumActiveDivisions(int count = 1) { numActiveDivisions_ += count; }
+-
+-    size_t getMoveInArcUsedSum() const  { return numUsedMoveInArcs_; }
+-    size_t getMoveOutArcUsedSum() const { return numUsedMoveOutArcs_; }
+-    void increaseNumUsedOutArcs(int count = 1) { numUsedMoveOutArcs_ += count; }
+-    void increaseNumUsedInArcs (int count = 1) { numUsedMoveInArcs_ += count; }
+-
+-    friend std::ostream& operator<<(std::ostream& lhs, const Node& rhs);
+-
+-    double getScoreDeltaForCurrentCellCount();
+-    std::shared_ptr<Node> getSharedPtr(){ return shared_from_this(); }
++	DPCT_API void increaseCellCount();
++	DPCT_API  void addToCellCountScore(size_t state, double score);
++
++	DPCT_API void registerInArc(Arc* arc);
++	DPCT_API void registerOutArc(Arc* arc);
++	DPCT_API bool removeInArc(Arc* arc);
++	DPCT_API bool removeOutArc(Arc* arc);
++
++	DPCT_API void reset();
++	DPCT_API void updateBestInArcAndScore();
++
++	DPCT_API ArcIt getInArcsBegin()  { return inArcs_.begin(); }
++	DPCT_API ArcIt getInArcsEnd()    { return inArcs_.end(); }
++	DPCT_API ArcIt getOutArcsBegin() { return outArcs_.begin(); }
++	DPCT_API ArcIt getOutArcsEnd()   { return outArcs_.end(); }
++	DPCT_API ConstArcIt getInArcsBegin() const { return inArcs_.begin(); }
++	DPCT_API ConstArcIt getInArcsEnd()   const { return inArcs_.end(); }
++	DPCT_API ConstArcIt getOutArcsBegin()const { return outArcs_.begin(); }
++	DPCT_API ConstArcIt getOutArcsEnd()  const { return outArcs_.end(); }
++	DPCT_API void visitInArcs(const VisitorFunction& func);
++	DPCT_API void visitInArcs (const ConstVisitorFunction& func) const;
++	DPCT_API void visitOutArcs(const VisitorFunction& func);
++	DPCT_API void visitOutArcs (const ConstVisitorFunction& func) const;
++
++	DPCT_API Arc* getAppearanceArc() const    { return appearanceArc_; }
++	DPCT_API Arc* getDisappearanceArc() const { return disappearanceArc_; }
++
++	DPCT_API Arc*  getBestInArc() const     { return bestInArc_; }
++	DPCT_API size_t getCellCount() const    { return cellCount_; }
++	DPCT_API double getCurrentScore() const { return currentScore_; }
++	DPCT_API size_t getNumStates() const {return cellCountScore_.size(); }
++
++	DPCT_API size_t getNumInArcs() const  { return inArcs_.size(); }
++	DPCT_API size_t getNumOutArcs() const { return outArcs_.size(); }
++
++	DPCT_API size_t getNumActiveDivisions() const { return numActiveDivisions_; }
++	DPCT_API void increaseNumActiveDivisions(int count = 1) { numActiveDivisions_ += count; }
++
++	DPCT_API size_t getMoveInArcUsedSum() const  { return numUsedMoveInArcs_; }
++	DPCT_API size_t getMoveOutArcUsedSum() const { return numUsedMoveOutArcs_; }
++	DPCT_API void increaseNumUsedOutArcs(int count = 1) { numUsedMoveOutArcs_ += count; }
++	DPCT_API void increaseNumUsedInArcs (int count = 1) { numUsedMoveInArcs_ += count; }
++
++	DPCT_API friend std::ostream& operator<<(std::ostream& lhs, const Node& rhs);
++
++	DPCT_API double getScoreDeltaForCurrentCellCount();
++	DPCT_API std::shared_ptr<Node> getSharedPtr(){ return shared_from_this(); }
+ 
+ protected:
+ 	// things every node needs
+diff --git a/include/trackingalgorithm.h b/include/trackingalgorithm.h
+index 682ce48..4463d20 100644
+--- a/include/trackingalgorithm.h
++++ b/include/trackingalgorithm.h
+@@ -1,6 +1,8 @@
+ #ifndef DPCT_TRACKING_ALGORITHM_H
+ #define DPCT_TRACKING_ALGORITHM_H
+ 
++#include "config.hpp"
++
+ #include <vector>
+ #include <functional>
+ #include <memory>
+@@ -13,7 +15,7 @@
+ namespace dpct
+ {
+ 
+-class TrackingAlgorithm
++class DPCT_API TrackingAlgorithm
+ {
+ public:
+     typedef std::vector<Arc*> Path;
+diff --git a/python/CMakeLists.txt b/python/CMakeLists.txt
+index fb7b61a..fdf1ac7 100644
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -1,8 +1,8 @@
+-cmake_minimum_required(VERSION 2.8)
++cmake_minimum_required(VERSION 3.8)
+ message( "\nConfiguring python wrapper:" )
+ 
+ # dependencies
+-find_package( Boost REQUIRED COMPONENTS python serialization )
++find_package( Boost REQUIRED COMPONENTS python3 serialization )
+ find_package( PythonInterp REQUIRED )
+ 
+ if(WIN32)
+@@ -43,7 +43,7 @@ endif()
+ # make use of ${PYTHON_EXECUTABLE} instead of /usr/bin/python
+ if(NOT DEFINED PYDPCT_INSTALL_DIR OR PYDPCT_INSTALL_DIR MATCHES "^$")
+     execute_process(COMMAND ${PYTHON_EXECUTABLE} -c 
+-                    "from distutils.sysconfig import *; print get_python_lib(1)"
++                    "from distutils.sysconfig import *; print(get_python_lib(1))"
+                     OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
+     file(TO_CMAKE_PATH ${PYTHON_SITE_PACKAGES} PYDPCT_INSTALL_DIR)
+ endif()
+diff --git a/src/magnusson.cpp b/src/magnusson.cpp
+index c3b70f6..7ef5a32 100644
+--- a/src/magnusson.cpp
++++ b/src/magnusson.cpp
+@@ -2,6 +2,7 @@
+ #include <algorithm>
+ #include <assert.h>
+ #include <sstream>
++#include <random>
+ 
+ #include "magnusson.h"
+ #include "trackingalgorithm.h"
+diff --git a/src/residualgraph.cpp b/src/residualgraph.cpp
+index 478684b..ef326e2 100644
+--- a/src/residualgraph.cpp
++++ b/src/residualgraph.cpp
+@@ -94,7 +94,7 @@ ResidualGraph::ShortestPathResult ResidualGraph::findShortestPath(
+ 
+     	// prepare for new iteration
+     	TimePoint iterationInitTime = std::chrono::high_resolution_clock::now();
+-		if(firstPath_ or !partialBFUpdates)
++		if(firstPath_ || !partialBFUpdates)
+ 		{
+ 			firstPath_ = false;
+ 			bf.init();
+diff --git a/src/userdata.cpp b/src/userdata.cpp
+index abb3506..e215b6e 100644
+--- a/src/userdata.cpp
++++ b/src/userdata.cpp
+@@ -1,5 +1,6 @@
+ #include "userdata.h"
+ #include <stdexcept>
++#include <string>
+ 
+ namespace dpct
+ {

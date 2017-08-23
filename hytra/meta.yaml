@@ -1,0 +1,46 @@
+package:
+  name: hytra
+  
+  {% set tagged_version = GIT_DESCRIBE_TAG %}
+
+  # If we're using a non-tagged revision, append '.postN' to the version
+  {% if GIT_DESCRIBE_NUMBER|int != 0 %}
+    {% set tagged_version = tagged_version + '.post' + GIT_DESCRIBE_NUMBER %}
+  {% endif %}
+
+  version: {{tagged_version}}
+
+source:
+  git_url: https://github.com/chaubold/hytra
+  # git_tag: 1.1.4 # cf40b584cfbbea9f02782dbd7ec6b46377d3d204 # master 2017/04/25
+  # git_tag: 6c65146d8e2fa1d1fbbb377561cf554345b48910 # python3 2017/01/19
+  git_tag: b5fa59db58e0ca1200b50064a792d717e3b57ef4 # py3-take2 2017/07/19
+  patches:
+    - python3.patch
+
+build:
+  number: 0
+  string: py{{CONDA_PY}}_{{PKG_BUILDNUM}}_g{{GIT_FULL_HASH[:7]}}
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python
+    - dpct
+    - yapsy
+    - vigra
+    - scikit-learn
+    - scikit-image
+    - h5py
+
+# test:
+  # imports:
+    # - hytra
+
+about:
+  home: https://github.com/chaubold/hytra
+  license: MIT
+  summary: 'Python tracking framework developed at the IAL lab @ University of Heidelberg'

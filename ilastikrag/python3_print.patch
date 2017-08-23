@@ -1,0 +1,161 @@
+diff --git ilastikrag/accumulators/similarity/__init__.py ilastikrag/accumulators/similarity/__init__.py
+index 00ab298..6a376f5 100644
+--- ilastikrag/accumulators/similarity/__init__.py
++++ ilastikrag/accumulators/similarity/__init__.py
+@@ -1 +1 @@
+-from similarity_flatedge_accumulator import SimilarityFlatEdgeAccumulator
++from .similarity_flatedge_accumulator import SimilarityFlatEdgeAccumulator
+diff --git ilastikrag/gui/__init__.py ilastikrag/gui/__init__.py
+index bb47eef..209701a 100644
+--- ilastikrag/gui/__init__.py
++++ ilastikrag/gui/__init__.py
+@@ -1 +1 @@
+-from feature_selection_dialog import FeatureSelectionDialog
++from .feature_selection_dialog import FeatureSelectionDialog
+diff --git ilastikrag/gui/feature_selection_dialog.py ilastikrag/gui/feature_selection_dialog.py
+index b843c30..2cd6c75 100644
+--- ilastikrag/gui/feature_selection_dialog.py
++++ ilastikrag/gui/feature_selection_dialog.py
+@@ -29,7 +29,7 @@ class FeatureSelectionDialog(QDialog):
+         dlg = FeatureSelectionDialog(channel_names, feature_names, default_selections)
+         dlg.exec_()
+         if dlg.exec_() == QDialog.Accepted:
+-            print dlg.selections()
++            print(dlg.selections())
+     """
+     def __init__(self, channel_names, feature_names, default_selections=None, parent=None):
+         """
+@@ -193,7 +193,7 @@ if __name__ == "__main__":
+                            'Membranes': ['standard_edge_quantiles'] }
+ 
+     selections = FeatureSelectionDialog.launch(channel_names, feature_names, default_selections)
+-    print selections
++    print(selections)
+ 
+ #     from PyQt4.QtGui import QApplication
+ #     app = QApplication([])
+@@ -204,4 +204,4 @@ if __name__ == "__main__":
+ #     dlg.raise_()
+ #     dlg.exec_()
+ # 
+-#     print dlg.selections()
++#     print(dlg.selections())
+diff --git ilastikrag/gui/util/__init__.py ilastikrag/gui/util/__init__.py
+index 2a9e261..cfb6227 100644
+--- ilastikrag/gui/util/__init__.py
++++ ilastikrag/gui/util/__init__.py
+@@ -1 +1 @@
+-from hierarchical_checklist_view import HierarchicalChecklistView, Checklist
++from .hierarchical_checklist_view import HierarchicalChecklistView, Checklist
+diff --git ilastikrag/gui/util/hierarchical_checklist_view.py ilastikrag/gui/util/hierarchical_checklist_view.py
+index 53275eb..82f9d38 100644
+--- ilastikrag/gui/util/hierarchical_checklist_view.py
++++ ilastikrag/gui/util/hierarchical_checklist_view.py
+@@ -308,14 +308,14 @@ if __name__ == "__main__":
+     
+     app.exec_()
+ 
+-    print treeview.checklist
+-    print treeview.checklist.to_tuples()
+-    print treeview.checklist.to_nested_dict()
++    print(treeview.checklist)
++    print(treeview.checklist.to_tuples())
++    print(treeview.checklist.to_nested_dict())
+ 
+     d = treeview.checklist.to_nested_dict(filter_by_checkstate=True)
+-    print d
+-    print ""
+-    print ""
++    print(d)
++    print("")
++    print("")
+ 
+     d = treeview.checklist.to_nested_dict()
+     assert d['first'][0] == Qt.Checked
+@@ -325,7 +325,7 @@ if __name__ == "__main__":
+     assert d['fourth'][0] == Qt.Unchecked
+ 
+     d = treeview.checklist.to_nested_dict(filter_by_checkstate=True)
+-    print d
++    print(d)
+     assert d['first'][0] == True
+     assert 'second' not in d
+     assert d['third']['third-first'][0] == True
+diff --git ilastikrag/rag.py ilastikrag/rag.py
+index 9132ad5..87e544e 100644
+--- ilastikrag/rag.py
++++ ilastikrag/rag.py
+@@ -1,5 +1,7 @@
+ from collections import defaultdict, OrderedDict, namedtuple
+-from itertools import izip, imap, groupby
++from itertools import groupby
++izip = zip
++imap = map
+ 
+ import numpy as np
+ import pandas as pd
+@@ -476,7 +478,7 @@ class Rag(object):
+ 
+            >>> rag = Rag(superpixels)
+            >>> feature_df = rag.compute_features(grayscale_img, ['standard_edge_mean', 'standard_sp_count'])
+-           >>> print list(feature_df.columns)
++           >>> print(list(feature_df.columns))
+            ['sp1', 'sp2', 'standard_edge_mean', 'standard_sp_count_sum', 'standard_sp_count_difference']
+         
+         +---------+---------+------------------------+---------------------------+----------------------------------+
+@@ -1017,18 +1019,18 @@ if __name__ == '__main__':
+         rag = Rag( watershed )
+     logger.info("Creating rag ({} superpixels, {} edges) took {} seconds"
+                 .format( rag.num_sp, rag.num_edges, timer.seconds() ))
+-    print "unique edge labels per axis: {}".format( [len(df['edge_label'].unique()) for df in rag.dense_edge_tables.values()] )
+-    print "Total pixel edges: {}".format( sum(len(df) for df in rag.dense_edge_tables ) )
++    print("unique edge labels per axis: {}".format( [len(df['edge_label'].unique()) for df in rag.dense_edge_tables.values()] ))
++    print("Total pixel edges: {}".format( sum(len(df) for df in rag.dense_edge_tables ) ))
+ 
+     with Timer() as timer:
+         edge_features_df = rag.compute_features(grayscale, feature_names)
+         #edge_features_df = rag.compute_features(None, ['edgeregion_edge_regionradii'])
+         
+-    print "Computing features with python Rag took: {}".format( timer.seconds() )
+-    #print edge_features_df[0:10]
++    print("Computing features with python Rag took: {}".format( timer.seconds() ))
++    #print(edge_features_df[0:10])
+     
+-    print ""
+-    print ""
++    print("")
++    print("")
+ 
+ #     # For comparison with vigra.graphs.vigra.graphs.regionAdjacencyGraph
+ #     import vigra
+@@ -1036,7 +1038,7 @@ if __name__ == '__main__':
+ #         gridGraph = vigra.graphs.gridGraph(watershed.shape)
+ #         rag = vigra.graphs.regionAdjacencyGraph(gridGraph, watershed)
+ #         #ids = rag.uvIds()
+-#     print "Creating vigra Rag took: {}".format( timer.seconds() )
++#     print("Creating vigra Rag took: {}".format( timer.seconds() ))
+ #  
+ #     from relabel_consecutive import relabel_consecutive
+ #     watershed = relabel_consecutive(watershed, out=watershed)
+@@ -1046,7 +1048,7 @@ if __name__ == '__main__':
+ #     with Timer() as timer:
+ #         gridGraphEdgeIndicator = vigra.graphs.edgeFeaturesFromImage(gridGraph,grayscale_f)
+ #         p0 = rag.accumulateEdgeFeatures(gridGraphEdgeIndicator)/255.0
+-#     print "Computing 1 vigra feature took: {}".format( timer.seconds() )
++#     print("Computing 1 vigra feature took: {}".format( timer.seconds() ))
+  
+ 
+ #     # For comparison with scikit-image Rag performance. (It's bad.)
+diff --git ilastikrag/tests/test_edgeregion_accumulator.py ilastikrag/tests/test_edgeregion_accumulator.py
+index 3210307..6675d81 100644
+--- ilastikrag/tests/test_edgeregion_accumulator.py
++++ ilastikrag/tests/test_edgeregion_accumulator.py
+@@ -41,7 +41,7 @@ class TestEdgeRegionEdgeAccumulator(object):
+             problem_rows = np.logical_or(np.isclose(radii[:, 0], transposed_radii[:, 0]) != 1,
+                                          np.isclose(radii[:, 1], transposed_radii[:, 1]) != 1)
+             problem_df = combined_features_df.loc[problem_rows][sorted(list(combined_features_df.columns))]
+-            print problem_df.transpose()
++            print(problem_df.transpose())
+             
+             debug_sp = np.zeros_like(superpixels, dtype=np.uint8)
+             for sp1 in problem_df['sp1'].values:
