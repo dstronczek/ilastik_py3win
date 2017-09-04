@@ -6,7 +6,6 @@ package:
 
 source:
   git_url: https://github.com/ilastik/ilastik-feature-selection
-  # git_tag: 88d0454b44f006e9f8963ec3188d42e8b9243ecd
   git_tag: c96efa84afdf72de1aea6974b4475584fed8a940 # master 2017/05/04
 
 build:

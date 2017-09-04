@@ -4,7 +4,6 @@ package:
 
 source:
   git_url: https://github.com/ilastik/wsdt
-  # git_tag: 5ed2c213aeef270a7bff59810b7a957b19d004cf # master 2016/10/27
   git_tag: d2f83e424de63216ca14580001f1c4f7ab24d7db # master 2017/05/04
 
 build:
