@@ -1,4 +1,5 @@
-{% set BOOST_VERSION = '1.64.0' %}
+# fix boost version, otherwise linking fails
+{% set BOOST_VERSION = '1.64.0' %} 
 
 package:
     name: dpct
@@ -13,7 +14,6 @@ package:
 source:
     git_url: https://github.com/chaubold/dpct
     git_tag: "1.2" # master 2017/02/27
-    # git_tag: 0b54eb97db6b6c5f1944b36b5d8e15ea260ae550 # master 2017/02/27
     patches:
       - windows_cmake_and_code.patch  # [win]
 
@@ -40,10 +40,6 @@ requirements:
     - boost {{BOOST_VERSION}}
     - lemon
     - python {{PY_VER}}*
-
-# test:
-  # imports:
-    # - dpct
 
 about:
     home: https://github.com/chaubold/dpct
