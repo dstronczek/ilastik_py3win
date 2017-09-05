@@ -1,0 +1,104 @@
+diff --git a/cmake/modules/FindILASTIKTOOLS_DEPENDENCIES.cmake b/cmake/modules/FindILASTIKTOOLS_DEPENDENCIES.cmake
+index c9390d5..1c871a2 100644
+--- a/cmake/modules/FindILASTIKTOOLS_DEPENDENCIES.cmake
++++ b/cmake/modules/FindILASTIKTOOLS_DEPENDENCIES.cmake
+@@ -38,8 +38,8 @@ ELSE()
+     MESSAGE(STATUS "Could NOT find Python libraries and/or includes")
+ ENDIF()
+ 
+-find_package(Boost COMPONENTS python REQUIRED)
+-if("${Boost_PYTHON_LIBRARY}" MATCHES "boost_python\\.lib")
++find_package(Boost COMPONENTS python3 REQUIRED)
++if("${Boost_PYTHON_LIBRARY}" MATCHES "boost_python3\\.lib")
+     ADD_DEFINITIONS(-DBOOST_AUTO_LINK_NOMANGLE)
+ endif()
+ 
+@@ -135,7 +135,7 @@ execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
+ INCLUDE(FindPackageHandleStandardArgs)
+ FIND_PACKAGE_HANDLE_STANDARD_ARGS(ILASTIKTOOLS_DEPENDENCIES DEFAULT_MSG
+                      PYTHONLIBS_FOUND
+-                     Boost_PYTHON_FOUND PYTHON_NUMPY_INCLUDE_DIR PYTHON_SITE_PACKAGES)
++                     Boost_PYTHON3_FOUND PYTHON_NUMPY_INCLUDE_DIR PYTHON_SITE_PACKAGES)
+ 
+ IF(NOT ILASTIKTOOLS_INCLUDE_DIRS OR ILASTIKTOOLS_INCLUDE_DIRS MATCHES "-NOTFOUND")
+     #note that the numpy include dir is set _before_ the python include dir, such that
+diff --git a/conda-recipe/meta.yaml b/conda-recipe/meta.yaml
+index fa7bb48..3ab3840 100644
+--- a/conda-recipe/meta.yaml
++++ b/conda-recipe/meta.yaml
+@@ -1,42 +1,34 @@
+ package:
+-    name: ilastiktools
+-
+-  {% if GIT_DESCRIBE_NUMBER|int == 0 %}
+-    version: {{GIT_DESCRIBE_TAG}}
+-  {% else %}
+-    # If we're using a non-tagged revision, append '.postN' to the version
+-    version: {{GIT_DESCRIBE_TAG}}.post{{GIT_DESCRIBE_NUMBER}}
+-  {% endif %}
++  name: ilastiktools
++  version: "0.2.post4"
+ 
+ source:
+-  path: ../
++  git_url: git://github.com/ilastik/ilastiktools.git
++  # git_tag: 731565e0be509e3a847b3a7d277aacee1ee0161a # master 2016/08/16
++  git_tag: b1ccf0a6717e6778106d804fc999747e7b0a8d05 # master 2017/07/06
++  patches:
++    - python3_cmake.patch
+ 
+ build:
+-  #
+-  # You must build this recipe using 'conda build --numpy=X.Y'
+-  #
++  features:
++    - vc14
+   number: 0
+-  string: np{{np}}py{{py}}_{{PKG_BUILDNUM}}_g{{GIT_FULL_HASH[:7]}}
++  detect_binary_files_with_prefix: true
++  string: 0_gb1ccf0a
++  msvc_compiler: 14.0  # [win]
+ 
+ requirements:
+   build:
+-    - gcc 4.8.5 # [linux]
+-    - python 2.7*|3.5*|3.6*
+-    - python {{PY_VER}}*
+-    - numpy {{NPY_VER}}*
+-    - vigra 1.11*
+-    - boost 1.63.0
++    - python   3.5*
++    - numpy    >=1.10
++    - vigra    1.11.*
++    - boost    1.64.*
+ 
+   run:
+-    - libgcc 4.8.5 # [linux]
+-    - python {{PY_VER}}*
+-    - numpy  {{NPY_VER}}*
+-    - vigra 1.11*
+-    - boost 1.63.0
+-
+-test:
+-  imports:
+-    - ilastiktools
++    - python   3.5*
++    - numpy    >=1.10
++    - vigra    1.11.*
++    - boost    1.64.*
+ 
+ about:
+   home: http://ilastik.org
+diff --git a/src/python/ilastiktools/CMakeLists.txt b/src/python/ilastiktools/CMakeLists.txt
+index a315aa3..c58add1 100644
+--- a/src/python/ilastiktools/CMakeLists.txt
++++ b/src/python/ilastiktools/CMakeLists.txt
+@@ -12,7 +12,7 @@ add_library( _core SHARED
+ find_library(RT rt)
+ target_link_libraries( _core
+     ${PYTHON_LIBRARIES}
+-    ${Boost_PYTHON_LIBRARIES}
++    ${Boost_PYTHON3_LIBRARIES}
+ )
+ 
+ IF(PYTHON_PLATFORM MATCHES "windows$" OR WIN32)
